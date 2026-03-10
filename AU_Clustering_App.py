@@ -84,3 +84,39 @@ if uploaded_file:
             
     except Exception as e:
         st.error(f"Error: {e}")
+
+# --- NEW SECTION: SINGLE CUSTOMER PREDICTION ---
+st.subheader("🎯 Test Single Customer")
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    in_r = st.number_input("Recency (days)", 0, 365, 30)
+with col2:
+    in_f = st.number_input("Frequency (count)", 1, 500, 5)
+with col3:
+    in_m = st.number_input("Monetary ($)", 0.0, 50000.0, 500.0)
+
+if st.button("Classify Customer"):
+    # 1. Create a dataframe for the single input
+    new_data = pd.DataFrame([[in_r, in_f, in_m]], columns=['Recency', 'Frequency', 'Monetary'])
+    
+    # 2. Predict (Pipeline handles the Imputation, Scaling, and Clustering)
+    new_data_log = np.log1p(new_data)
+    prediction = pipeline.predict(new_data_log)[0]
+    
+    # 3. Display Result
+    st.success(f"### This customer belongs to: Cluster {prediction}")
+    
+    # 4. Visual context: Show where this customer sits relative to the dataset
+    if 'rfm' in locals(): # Only show chart if bulk data is loaded
+        temp_df = rfm.copy()
+        temp_df['Type'] = 'Existing Customers'
+        new_row = pd.DataFrame({'Recency': [in_r], 'Frequency': [in_f], 'Monetary': [in_m], 
+                                'Cluster': [prediction], 'Type': 'New Input'})
+        combined = pd.concat([temp_df, new_row])
+        
+        
+        fig = px.scatter_3d(combined, x='Recency', y='Frequency', z='Monetary', 
+                            color='Cluster', symbol='Type', size_max=10,
+                            title="Your Customer Relative to Existing Segments")
+        st.plotly_chart(fig, use_container_width=True)
