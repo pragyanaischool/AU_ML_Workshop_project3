@@ -3,59 +3,65 @@ import joblib
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-# Set page configuration
-st.set_page_config(page_title="Customer Segmentation App", layout="wide")
+# Page Config
+st.set_page_config(page_title="Customer Segmentation AI", layout="wide")
 
-# Load the saved pipeline (scaler + model)
+# Load Pipeline
 @st.cache_resource
 def load_pipeline():
     return joblib.load('model_pipeline.pkl')
 
 pipeline = load_pipeline()
 
-st.title(" Customer Segmentation AI")
+st.title("📊 Customer Segmentation AI")
 st.markdown("Use this tool to segment customers based on Recency, Frequency, and Monetary (RFM) values.")
 
-# Sidebar for individual testing
+# --- SIDEBAR: Individual Prediction ---
 with st.sidebar:
     st.header("Individual Prediction")
-    recency = st.number_input("Recency (days)", 0, 365, 30)
-    frequency = st.number_input("Frequency (transactions)", 1, 1000, 5)
-    monetary = st.number_input("Monetary ($)", 0.0, 50000.0, 500.0)
+    r = st.number_input("Recency (days)", 0, 365, 30)
+    f = st.number_input("Frequency (transactions)", 1, 1000, 5)
+    m = st.number_input("Monetary ($)", 0.0, 50000.0, 500.0)
     
     if st.button("Predict Segment"):
-        input_data = pd.DataFrame([[recency, frequency, monetary]], 
-                                  columns=['Recency', 'Frequency', 'Monetary'])
-        input_log = np.log1p(input_data)
-        cluster = pipeline.predict(input_log)
+        data = pd.DataFrame([[r, f, m]], columns=['Recency', 'Frequency', 'Monetary'])
+        data_log = np.log1p(data)
+        cluster = pipeline.predict(data_log)
         st.subheader(f"Assigned Cluster: {cluster[0]}")
 
-# Bulk testing section
+# --- MAIN: Bulk Analysis ---
 st.divider()
-st.subheader("Bulk Testing & Analysis")
-uploaded_file = st.file_uploader("Upload a CSV file for batch segmentation", type=['csv'])
+st.subheader("Bulk Testing & Cluster Profiling")
+uploaded_file = st.file_uploader("Upload CSV (Columns: Recency, Frequency, Monetary)", type=['csv'])
 
-if uploaded_file is not None:
+if uploaded_file:
     test_df = pd.read_csv(uploaded_file)
     
-    # Preprocessing
-    features = test_df[['Recency', 'Frequency', 'Monetary']]
-    features_log = np.log1p(features)
-    
-    # Prediction
+    # Predict
+    features_log = np.log1p(test_df[['Recency', 'Frequency', 'Monetary']])
     test_df['Cluster'] = pipeline.predict(features_log)
     
-    # Display results
-    st.write("### Processed Data")
-    st.dataframe(test_df.head())
+    # 1. Visualization
+    st.write("### 3D Cluster Visualization")
     
-    # Visualization
-    st.write("### Cluster Visualization")
-    fig = px.scatter_3d(test_df, x='Recency', y='Frequency', z='Monetary', 
-                        color='Cluster', title="Customer Segments in 3D Space")
-    st.plotly_chart(fig)
+    fig = px.scatter_3d(test_df, x='Recency', y='Frequency', z='Monetary', color='Cluster')
+    st.plotly_chart(fig, use_container_width=True)
     
-    # Download results
+    # 2. Statistical Analysis
+    st.write("### Cluster Profiles")
+    analysis = test_df.groupby('Cluster')[['Recency', 'Frequency', 'Monetary']].mean()
+    st.table(analysis)
+    
+    # 3. Distribution Charts
+    st.write("### Feature Distribution by Cluster")
+    fig2, axes = plt.subplots(1, 3, figsize=(15, 4))
+    for i, col in enumerate(['Recency', 'Frequency', 'Monetary']):
+        sns.boxplot(x='Cluster', y=col, data=test_df, ax=axes[i])
+    st.pyplot(fig2)
+    
+    # 4. Download
     csv = test_df.to_csv(index=False).encode('utf-8')
-    st.download_button("Download Results", csv, "segmentation_results.csv", "text/csv")
+    st.download_button("Download Segmented Results", csv, "results.csv", "text/csv")
