@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 # Page Config
 st.set_page_config(page_title="Customer Segmentation AI", layout="wide")
 
-# Load Pipeline
 @st.cache_resource
 def load_pipeline():
     return joblib.load('model_pipeline.pkl')
@@ -34,11 +33,11 @@ with st.sidebar:
 # --- MAIN: Bulk Analysis ---
 st.divider()
 st.subheader("Bulk Testing & Cluster Profiling")
-uploaded_file = st.file_uploader("Upload CSV (Required: Recency, Frequency, Monetary)", type=['csv'])
+uploaded_file = st.file_uploader("Upload CSV", type=['csv'])
 
 if uploaded_file:
     try:
-        # Robust loading to fix UnicodeDecodeError
+        # Robust loading
         test_df = None
         for enc in ['utf-8', 'ISO-8859-1', 'cp1252']:
             try:
@@ -49,34 +48,38 @@ if uploaded_file:
                 continue
         
         if test_df is not None:
-            # Prediction Logic
-            required_cols = ['Recency', 'Frequency', 'Monetary']
-            features_log = np.log1p(test_df[required_cols])
-            test_df['Cluster'] = pipeline.predict(features_log)
+            # --- AUTO-FIX COLUMN NAMES ---
+            test_df.columns = test_df.columns.str.strip().str.capitalize()
+            # Mapping common variations
+            mapping = {'Recency': 'Recency', 'Frequency': 'Frequency', 'Monetary': 'Monetary'}
+            test_df = test_df.rename(columns=mapping)
             
-            # 1. Visualization
-            st.write("### 3D Cluster Visualization")
-            
-            fig = px.scatter_3d(test_df, x='Recency', y='Frequency', z='Monetary', color='Cluster')
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # 2. Statistical Analysis
-            st.write("### Cluster Profiles (Mean Values)")
-            analysis = test_df.groupby('Cluster')[['Recency', 'Frequency', 'Monetary']].mean()
-            st.table(analysis)
-            
-            # 3. Distribution Charts
-            st.write("### Feature Distribution by Cluster")
-            
-            fig2, axes = plt.subplots(1, 3, figsize=(15, 4))
-            for i, col in enumerate(required_cols):
-                sns.boxplot(x='Cluster', y=col, data=test_df, ax=axes[i])
-            st.pyplot(fig2)
-            
-            # 4. Download
-            csv = test_df.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Segmented Results", csv, "results.csv", "text/csv")
-        else:
-            st.error("Failed to read file. Please ensure it is a valid CSV.")
+            required = ['Recency', 'Frequency', 'Monetary']
+            if not all(col in test_df.columns for col in required):
+                st.error(f"Missing columns. Found: {list(test_df.columns)}. Need: {required}")
+            else:
+                # Prediction
+                features_log = np.log1p(test_df[required])
+                test_df['Cluster'] = pipeline.predict(features_log)
+                
+                # Visuals
+                
+                fig = px.scatter_3d(test_df, x='Recency', y='Frequency', z='Monetary', color='Cluster')
+                st.plotly_chart(fig, use_container_width=True)
+                
+                st.write("### Cluster Profiles")
+                analysis = test_df.groupby('Cluster')[required].mean()
+                st.table(analysis)
+                
+                # Distribution
+                
+                fig2, axes = plt.subplots(1, 3, figsize=(15, 4))
+                for i, col in enumerate(required):
+                    sns.boxplot(x='Cluster', y=col, data=test_df, ax=axes[i])
+                st.pyplot(fig2)
+                
+                csv = test_df.to_csv(index=False).encode('utf-8')
+                st.download_button("Download Results", csv, "results.csv", "text/csv")
+                
     except Exception as e:
-        st.error(f"Error processing file: {e}")
+        st.error(f"An error occurred: {e}")
