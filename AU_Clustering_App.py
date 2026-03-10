@@ -16,7 +16,7 @@ def load_pipeline():
 
 pipeline = load_pipeline()
 
-st.title("📊 Customer Segmentation AI")
+st.title("PragyanAI - Customer Segmentation AI")
 
 uploaded_file = st.file_uploader("Upload CSV", type=['csv'])
 
@@ -86,7 +86,7 @@ if uploaded_file:
         st.error(f"Error: {e}")
 
 # --- NEW SECTION: SINGLE CUSTOMER PREDICTION ---
-st.subheader("🎯 Test Single Customer")
+st.subheader(" PrayanAI - Test Single Customer")
 
 col1, col2, col3 = st.columns(3)
 with col1:
